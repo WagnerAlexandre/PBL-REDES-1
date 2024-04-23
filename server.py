@@ -15,13 +15,3 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s_UDP:
         data = int.from_bytes(data)
         
         print('Mensagem recebida de {}: {}'.format(addr, data ))
-
-
-'''
-Implementar 4 threads:
-Entrada e Saida de informações para os clientes
-Entrada e Saida de informações para os sensores
-
-
-
-'''
