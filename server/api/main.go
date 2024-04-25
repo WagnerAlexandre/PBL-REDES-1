@@ -13,8 +13,9 @@ func main() {
 }
 
 type Sensor struct {
-	ID   int
-	Temp int
+	ID    int
+	Temp  int
+	State int
 }
 
 func getSensors(w http.ResponseWriter, request *http.Request) {
