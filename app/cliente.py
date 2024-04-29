@@ -2,10 +2,10 @@ import socket
 import threading as THR
 import os
 
-import sensor
+import device.sensor as sensor
 
 def printAllSensors(sensorArray):
-    print("\n Situacao atual dos sensores:\n")
+    print("\n Situação atual dos sensores:\n")
     print("\n----------------   ----------------   ----------------   ----------------\n")
 
     for i in range(0,32):

@@ -1,11 +1,11 @@
-package main
+package api
 
 import (
 	"log"
 	"net/http"
 )
 
-func main() {
+func api() {
 	http.HandleFunc("/sensors", getSensors)
 
 	println("API IS ON: 8080")

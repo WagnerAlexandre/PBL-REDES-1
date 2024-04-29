@@ -7,7 +7,7 @@ import (
 
 func main() {
 	// Endereço e porta do servidor
-	udpAddr, err := net.ResolveUDPAddr("udp", "127.0.0.1:65432")
+	udpAddr, err := net.ResolveUDPAddr("udp", "127.0.0.1:65000")
 	if err != nil {
 		fmt.Println("Erro ao resolver o endereço UDP:", err)
 		return
