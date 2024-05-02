@@ -5,6 +5,13 @@ import (
 	"net"
 )
 
+type Sensor struct {
+	UC     string
+	ID     int
+	TEMP   int
+	ESTADO int
+}
+
 func main() {
 	// Endereço e porta do servidor
 	udpAddr, err := net.ResolveUDPAddr("udp", "127.0.0.1:65000")

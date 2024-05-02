@@ -67,8 +67,34 @@ def msgMenu():
             )
     pass
 
+def receiver():
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind((HOST, PORT))
+        s.listen()
+        print(f"Servidor de comandos escutando em {HOST}:{PORT}")
+        while True:
+            conn, addr = s.accept()
+            with conn:
+                print(f"Conexão estabelecida de {addr}")
+                while True:
+                    data = conn.recv(1024)
+                    if not data:
+                        break
+                    comando_str = data.decode('utf-8')
+                    process_commands(comando_str)
+
+def process_commands(comando_str):
+    comando, id_sensor, ip_requisitante = comando_str.split('|')
+    process_command(comando, id_sensor, ip_requisitante)
+
+def process_command(comando, id_sensor, ip_requisitante):
+    print(f"Comando recebido - Comando: {comando}, ID do sensor: {id_sensor}, IP do requisitante: {ip_requisitante}")
 
 
+receiver_thread = thr.Thread(target=receiver, daemon=True)
+receiver_thread.start()
+
+UCname = input("Nomeie esta UC (Unidade Controladora): ")
 
 menu = 1
 while menu in (1,2,3,4,5):
