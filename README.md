@@ -24,7 +24,8 @@ Uso: Ao executar a aplicação, uma janela será exibida solicitando que você i
 ##### Notas
  A aplicação usa uma GUI simples construída com Tkinter.
  Ela se comunica com um servidor em execução em localhost:8080. Certifique-se de que o servidor esteja em execução antes de usar a aplicação.
-
+ 
+-----------------
 ## Servidor da API de Gerenciamento de Sensores
  Esta é a API de gerenciamento de sensores, que implementa os endpoints para manipular unidades de controle e sensores.
 
@@ -37,7 +38,7 @@ Uso: Ao executar a aplicação, uma janela será exibida solicitando que você i
 #### Uso da API
  Após iniciar o servidor, você pode fazer requisições HTTP para os endpoints.
 
-
+-----------------
 ## Controladora de Sensores
  A controladora de sensores é responsável por gerenciar os sensores conectados e executar comandos enviados por outros dispositivos.
 
