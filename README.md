@@ -23,7 +23,7 @@ Uso: Ao executar a aplicação, uma janela será exibida solicitando que você i
 
 ##### Notas
  A aplicação usa uma GUI simples construída com Tkinter.
- Ela se comunica com um servidor em execução em localhost:8080. Certifique-se de que o servidor esteja em execução antes de usar a aplicação.
+
  
 -----------------
 ## Servidor da API de Gerenciamento de Sensores
