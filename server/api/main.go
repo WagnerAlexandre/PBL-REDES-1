@@ -6,10 +6,11 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"strconv"
+	"strings"
 )
 
-var Usuarios []User
-var UnidadesControle []CUnits
+var UnidadesControle = make(map[string]CUnits)
 
 func receiverTCP(ip string, TCPport int, done chan struct{}) {
 	listener, err := net.Listen("tcp", fmt.Sprintf("%s:%d", ip, TCPport))
@@ -61,31 +62,110 @@ func handleConnection(conn net.Conn) {
 	}
 
 	if infor.Tipo == 1 {
-		registerUC(infor.Conteudo)
+		// Chame a função registerUC passando o nome da unidade de controle
+		registerUC(infor.Conteudo, conn)
+	}
+}
+
+func registerUC(nomeUC string, conn net.Conn) {
+	// Verifique se a unidade de controle já existe no mapa UnidadesControle
+	if _, ok := UnidadesControle[nomeUC]; ok {
+		// Se a unidade de controle já existe, envie uma mensagem de erro para a conexão indicando que a operação falhou
+		conn.Write([]byte("ERROA1"))
+		return
 	}
 
+	// Caso contrário, crie uma nova unidade de controle e adicione ao mapa
+	UnidadesControle[nomeUC] = CUnits{
+		Name:     nomeUC,
+		Sensores: make(map[int]Sensor), // Inicialize o mapa de sensores
+		IP:       conn.RemoteAddr().(*net.TCPAddr).IP,
+	}
+	// Envie uma mensagem de sucesso para a conexão indicando que a operação foi bem-sucedida
+	conn.Write([]byte("Unidade de controle registrada com sucesso"))
 }
 
-func registerUC(nomeUC string) {
-	var newUnit CUnits
-	newUnit.Name = nomeUC
-	UnidadesControle = append(UnidadesControle, newUnit)
+type CUnits struct {
+	Name      string
+	Sensores  map[int]Sensor
+	Inscritos []string
+	IP        net.IP
 }
 
-func receiverUDP(ip string, UDPport int) {
+func receiverUDP(ip string, UDPport int, done chan struct{}) {
+	// Crie um endereço UDP
+	address, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", ip, UDPport))
+	if err != nil {
+		fmt.Println("Erro ao resolver endereço UDP:", err)
+		return
+	}
+
+	// Crie uma conexão UDP
+	conn, err := net.ListenUDP("udp", address)
+	if err != nil {
+		fmt.Println("Erro ao criar conexão UDP:", err)
+		return
+	}
+	defer conn.Close()
+
+	fmt.Println("Receptor UDP está escutando em", conn.LocalAddr())
+
+	// Buffer para armazenar os dados recebidos
+	buffer := make([]byte, 1024)
+
+	// Loop infinito para aguardar mensagens UDP
+	for {
+		select {
+		case <-done:
+			fmt.Println("Receptor UDP encerrado.")
+			return
+		default:
+			// Aguardar a recepção de dados
+			n, _, err := conn.ReadFromUDP(buffer)
+			if err != nil {
+				fmt.Println("Erro ao ler dados UDP:", err)
+				continue
+			}
+
+			//atualizar no dicionario os dados recebidos:
+			freshInfo(string(buffer[:n]))
+		}
+	}
+}
+
+func freshInfo(info string) {
+	pack := strings.Split(info, "|")
+	id, _ := strconv.Atoi(pack[1])   // Convertendo o ID do sensor para inteiro
+	temp, _ := strconv.Atoi(pack[2]) // Convertendo a temperatura para inteiro
+
+	// Verifique se a unidade de controle existe no mapa UnidadesControle
+	unit, ok := UnidadesControle[pack[0]]
+	if !ok {
+		fmt.Println("Unidade de controle não encontrada:", pack[0])
+		return
+	}
+
+	// Verifique se o sensor existe no mapa de sensores da unidade de controle
+	sensor, ok := unit.Sensores[id]
+	if !ok {
+		// Se o sensor não existir, crie um novo sensor e adicione ao mapa de sensores da unidade de controle
+		unit.Sensores[id] = Sensor{ID: id}
+		sensor = unit.Sensores[id]
+	}
+
+	// Atualize a temperatura do sensor
+	sensor.TEMP = temp
 
 }
 
 func main() {
-	ip := "127.0.0.1"
+	ip := "192.168.1.101"
 	TCPport := 8080
 	UDPport := 1080
-
 	done := make(chan struct{})
 
 	go receiverTCP(ip, TCPport, done)
-
-	go receiverUDP(ip, UDPport)
+	go receiverUDP(ip, UDPport, done)
 
 	http.HandleFunc("/sensors", getSensors)
 	http.HandleFunc("/instSensor", instSensors)
@@ -93,6 +173,9 @@ func main() {
 
 	fmt.Println("API is ON :8080")
 	log.Fatal(http.ListenAndServe(":8080", nil))
+
+	<-done
+
 }
 
 func subscribe(w http.ResponseWriter, r *http.Request) {
@@ -106,21 +189,14 @@ func subscribe(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	for i := range UnidadesControle {
-		if UnidadesControle[i].Name == item.UnitName {
-			UnidadesControle[i].Inscritos = append(UnidadesControle[i].Inscritos, item.UserName)
-			w.WriteHeader(http.StatusCreated)
-			return
-		}
+	unit, ok := UnidadesControle[item.UnitName]
+	if !ok {
+		http.Error(w, "Unidade de controle não encontrada", http.StatusNotFound)
+		return
 	}
 
-	http.Error(w, "Unidade de controle não encontrada", http.StatusNotFound)
-}
-
-type CUnits struct {
-	Name      string
-	Sensores  []Sensor
-	Inscritos []string
+	unit.Inscritos = append(unit.Inscritos, item.UserName)
+	w.WriteHeader(http.StatusCreated)
 }
 
 type Sensor struct {

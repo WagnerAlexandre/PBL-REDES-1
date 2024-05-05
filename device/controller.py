@@ -1,16 +1,15 @@
 from sensor import Sensor
 import threading as thr
-import requests
 import socket
 import json
 import os
 
-HOST = '127.0.0.1'
-PORT = 8080
+SERVERTCPPORT = 8080
+SERVERUDPPORT = 1080
+SERVEIP = '192.168.1.101'
 
-# URLS
 
-REGUC = '127.0.0.1'
+
 
 def clear():
     os.system('cls')
@@ -79,21 +78,43 @@ class Messagem():
         self.Conteudo = conteudo
         pass
 
-def register(UCname, REGUC):
+def register(UCname):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.connect((REGUC, PORT))
+        s.connect((SERVEIP, SERVERTCPPORT))
         msg = json.dumps({
         "Tipo": 1,
         "Conteudo": UCname
     }).encode()
         s.sendall(msg)
-        print("Registro enviado para a UC.")
-        resp = s.recv(1024)
-    return resp.decode()
+        print("Registro enviado para o servidor")
+        resp = s.recv(1024).decode()
+        if resp == "ERROA1":
+            return 1
+    return 0
 
-def receiver():
-    resp = requests.post(REGUC,UCname)
-    print(resp)
+def receiver_tcp(REGUC, port, done):
+    # Cria um socket TCP/IP
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        while done:
+            # Associa o socket à porta
+            s.bind((REGUC, port))
+            # Coloca o socket para escutar conexões
+            s.listen()
+            # Aceita a conexão
+            conn, addr = s.accept()
+            with conn:
+                while True:
+                    # Recebe os dados
+                    data = conn.recv(1024)
+                    if not data:
+                        break
+                    else:
+                        multiplexador(data)
+
+def multiplexador(data):
+    print(data)
+
+    pass
 
 def process_commands(comando_str):
     comando, id_sensor, ip_requisitante = comando_str.split('|')
@@ -102,12 +123,20 @@ def process_commands(comando_str):
 def process_command(comando, id_sensor, ip_requisitante):
     print(f"Comando recebido - Comando: {comando}, ID do sensor: {id_sensor}, IP do requisitante: {ip_requisitante}")
 
-UCname = input("Nomeie esta UC (Unidade Controladora): ")
+err = 1
+while err:
+    clear()
+    UCname = input("Nomeie esta UC (Unidade Controladora): ")   
 
-
-print(register(UCname,REGUC))
-input()
-
+    err = register(UCname)
+    if err==1:
+        print("Controladora já existe no sistema.")
+    elif err ==0:
+        print("Registro feito com sucesso!")
+    input()
+    
+receiver_thr = thr.Thread(target=receiver_tcp,daemon=True)
+receiver_thr.start()
 menu = 1
 while menu in (1,2,3,4,5):
 
@@ -134,7 +163,7 @@ while menu in (1,2,3,4,5):
             sensor = searchSensor(r_id, sensores)
             if sensor:
                 sensor.altState(1)
-                ex_thread = thr.Thread(target=sensor.startMonitoring,args=(HOST, PORT,UCname,),daemon=True)
+                ex_thread = thr.Thread(target=sensor.startMonitoring,args=(SERVEIP, SERVERUDPPORT,UCname,),daemon=True)
                 snrsThreads[r_id] = ex_thread
                 snrsThreads[r_id].start()
                 pass
