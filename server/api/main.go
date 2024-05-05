@@ -4,33 +4,95 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 )
 
 var Usuarios []User
 var UnidadesControle []CUnits
 
+func receiverTCP(ip string, TCPport int, done chan struct{}) {
+	listener, err := net.Listen("tcp", fmt.Sprintf("%s:%d", ip, TCPport))
+	if err != nil {
+		fmt.Println("Erro ao criar o listener TCP:", err)
+		return
+	}
+	defer listener.Close()
+
+	fmt.Println("Receptor TCP está escutando em", listener.Addr())
+
+	for {
+		select {
+		case <-done:
+			fmt.Println("Receptor TCP encerrado.")
+			return
+		default:
+			conn, err := listener.Accept()
+			if err != nil {
+				fmt.Println("Erro ao aceitar a conexão:", err)
+				continue
+			}
+			go handleConnection(conn)
+		}
+	}
+}
+
+type Mensagem struct {
+	Tipo     int
+	Conteudo string
+}
+
+func handleConnection(conn net.Conn) {
+	defer conn.Close()
+
+	buffer := make([]byte, 1024)
+	n, err := conn.Read(buffer)
+	if err != nil {
+		fmt.Println("Erro ao ler os dados:", err)
+		return
+	}
+
+	var infor Mensagem
+
+	err = json.Unmarshal(buffer[:n], &infor)
+	if err != nil {
+		fmt.Println("Erro ao decodificar a mensagem:", err)
+		return
+	}
+
+	if infor.Tipo == 1 {
+		registerUC(infor.Conteudo)
+	}
+
+}
+
+func registerUC(nomeUC string) {
+	var newUnit CUnits
+	newUnit.Name = nomeUC
+	UnidadesControle = append(UnidadesControle, newUnit)
+}
+
+func receiverUDP(ip string, UDPport int) {
+
+}
+
 func main() {
+	ip := "127.0.0.1"
+	TCPport := 8080
+	UDPport := 1080
+
+	done := make(chan struct{})
+
+	go receiverTCP(ip, TCPport, done)
+
+	go receiverUDP(ip, UDPport)
 
 	http.HandleFunc("/sensors", getSensors)
 	http.HandleFunc("/instSensor", instSensors)
 	http.HandleFunc("/subscribe", subscribe)
-	http.HandleFunc("/register", registerUC)
 
 	fmt.Println("API is ON :8080")
 	log.Fatal(http.ListenAndServe(":8080", nil))
-}
-
-func registerUC(w http.ResponseWriter, r *http.Request) {
-	var newUnit CUnits
-	err := json.NewDecoder(r.Body).Decode(&newUnit)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	UnidadesControle = append(UnidadesControle, newUnit)
-	w.WriteHeader(http.StatusCreated)
 }
 
 func subscribe(w http.ResponseWriter, r *http.Request) {
@@ -60,6 +122,7 @@ type CUnits struct {
 	Sensores  []Sensor
 	Inscritos []string
 }
+
 type Sensor struct {
 	ID     int
 	UC     string
@@ -88,10 +151,8 @@ func instSensors(w http.ResponseWriter, r *http.Request) {
 }
 
 func getSensors(w http.ResponseWriter, r *http.Request) {
-
 	if r.Method != "GET" {
 		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
 		return
 	}
-
 }

@@ -1,11 +1,9 @@
 import tkinter as tk
 from tkinter import ttk
-from tkinter import simpledialog
+from tkinter import simpledialog, messagebox
 import threading as thr
 import requests
 import time
-
-
 
 
 class InitialScreen:
@@ -73,11 +71,13 @@ class SensorManagementApp:
     def connect_uc(self):
         uc_name = simpledialog.askstring("Conectar-se a uma UC", "Digite o nome da UC:")
         if uc_name:
-            response = requests.post('http://localhost:8080/subscribe',json={
+            response = requests.post('http://localhost:8080/subscribe', json={
                 "userName": self.identifier
-            }).json()
-            
-            pass
+            })
+            if response.status_code == 201:
+                messagebox.showinfo("Sucesso", "Conexão bem-sucedida!")
+            else:
+                messagebox.showerror("Erro", f"Erro ao conectar: {response.text}")
 
     def instantiate_sensor(self):
         #uc_name = simpledialog.askstring("Instanciar um sensor", "Digite o nome da UC:")

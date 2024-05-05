@@ -1,23 +1,29 @@
 from sensor import Sensor
 import threading as thr
+import requests
 import socket
+import json
 import os
 
 HOST = '127.0.0.1'
-PORT = 65000
+PORT = 8080
+
+# URLS
+
+REGUC = '127.0.0.1'
 
 def clear():
     os.system('cls')
 
-def print_Sns_ID(sensores: list[Sensor]):
+def print_Sns_ID(sensores):
     for i in sensores:
         print(f"ID: {i.get_id()} ULTIMA LEITURA: {i.get_temp()}")
     input("Enter para continuar...")
 
-def createId(sensores: list[Sensor]):
+def createId(sensores):
     return sensores[-1].get_id()+1
 
-def createNewSensor(sensores: list[Sensor]):
+def createNewSensor(sensores):
     if sensores.__len__() == 0:
         new_id = 0
     else:
@@ -28,7 +34,7 @@ def createNewSensor(sensores: list[Sensor]):
   
     return new_id
 
-def excludeSensor(id: int, sensores: list[Sensor]):
+def excludeSensor(id: int, sensores):
     rmv = searchSensor(id,sensores)
     if rmv:
         rmv.altState(0)
@@ -38,7 +44,7 @@ def excludeSensor(id: int, sensores: list[Sensor]):
     else:
         return 0
 
-def searchSensor(id: int, sensores: list[Sensor]):
+def searchSensor(id: int, sensores):
     fd = 0
     for i in sensores:
         if i.get_id()==id:
@@ -67,21 +73,27 @@ def msgMenu():
             )
     pass
 
-def receiver():
+class Messagem():
+    def __init__(self,tipo: int,conteudo: str) -> None:
+        self.Tipo = tipo
+        self.Conteudo = conteudo
+        pass
+
+def register(UCname, REGUC):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind((HOST, PORT))
-        s.listen()
-        print(f"Servidor de comandos escutando em {HOST}:{PORT}")
-        while True:
-            conn, addr = s.accept()
-            with conn:
-                print(f"Conexão estabelecida de {addr}")
-                while True:
-                    data = conn.recv(1024)
-                    if not data:
-                        break
-                    comando_str = data.decode('utf-8')
-                    process_commands(comando_str)
+        s.connect((REGUC, PORT))
+        msg = json.dumps({
+        "Tipo": 1,
+        "Conteudo": UCname
+    }).encode()
+        s.sendall(msg)
+        print("Registro enviado para a UC.")
+        resp = s.recv(1024)
+    return resp.decode()
+
+def receiver():
+    resp = requests.post(REGUC,UCname)
+    print(resp)
 
 def process_commands(comando_str):
     comando, id_sensor, ip_requisitante = comando_str.split('|')
@@ -90,11 +102,11 @@ def process_commands(comando_str):
 def process_command(comando, id_sensor, ip_requisitante):
     print(f"Comando recebido - Comando: {comando}, ID do sensor: {id_sensor}, IP do requisitante: {ip_requisitante}")
 
-
-receiver_thread = thr.Thread(target=receiver, daemon=True)
-receiver_thread.start()
-
 UCname = input("Nomeie esta UC (Unidade Controladora): ")
+
+
+print(register(UCname,REGUC))
+input()
 
 menu = 1
 while menu in (1,2,3,4,5):
@@ -122,7 +134,7 @@ while menu in (1,2,3,4,5):
             sensor = searchSensor(r_id, sensores)
             if sensor:
                 sensor.altState(1)
-                ex_thread = thr.Thread(target=sensor.startMonitoring,args=(HOST, PORT,),daemon=True)
+                ex_thread = thr.Thread(target=sensor.startMonitoring,args=(HOST, PORT,UCname,),daemon=True)
                 snrsThreads[r_id] = ex_thread
                 snrsThreads[r_id].start()
                 pass
