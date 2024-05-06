@@ -3,35 +3,18 @@ from tkinter import ttk
 from tkinter import simpledialog, messagebox
 import threading as thr
 import requests
+import json
 import time
 
 
-class InitialScreen:
-    def __init__(self, root):
-        self.root = root
-        self.root.title("Identificação")
-        self.root.geometry("300x200")
-
-        self.identifier = ""
-
-        self.label = tk.Label(root, text="Digite seu nome identificador:")
-        self.label.pack(pady=10)
-
-        self.entry = tk.Entry(root)
-        self.entry.pack(pady=5)
-
-        self.button = tk.Button(root, text="Confirmar", command=self.confirm_identifier)
-        self.button.pack(pady=5)
-
-    def confirm_identifier(self):
-        self.identifier = self.entry.get()
-        self.root.destroy()
+SERVERIP = '192.168.1.101'
+TCPPORT='8080'
 
 class SensorManagementApp:
-    def __init__(self, root, identifier):
+    def __init__(self, root):
         self.root = root
         self.root.title("Sensor Management")
-        self.identifier = identifier
+        self.subs = []
 
         # Create table
         self.tree = ttk.Treeview(self.root, columns=("UC", "ID", "TEMP", "Estado"), show="headings")
@@ -71,11 +54,16 @@ class SensorManagementApp:
     def connect_uc(self):
         uc_name = simpledialog.askstring("Conectar-se a uma UC", "Digite o nome da UC:")
         if uc_name:
-            response = requests.post('http://localhost:8080/subscribe', json={
-                "userName": self.identifier
+            response = requests.post("http://"+SERVERIP+":"+TCPPORT+'/verificar', json={
+                "UcName": uc_name
             })
-            if response.status_code == 201:
-                messagebox.showinfo("Sucesso", "Conexão bem-sucedida!")
+            if response.status_code == 200:
+                if self.subs.count(uc_name):
+                    messagebox.showinfo("Erro", "Já inscrito na unidade de controle!")
+                else:
+
+                    messagebox.showinfo("Sucesso", "Conexão bem-sucedida!")
+                    self.subs.append(uc_name)
             else:
                 messagebox.showerror("Erro", f"Erro ao conectar: {response.text}")
 
@@ -87,8 +75,7 @@ class SensorManagementApp:
             sensor_count = 4
             if sensor_count:
   
-            
-                err = requests.post("http://localhost:8080/instSensor",json={
+                err = requests.post(SERVERIP+TCPPORT+"/instSensor",json={
                 "ucName": uc_name,
                 "sensorCount": sensor_count
                 })
@@ -112,21 +99,26 @@ class SensorManagementApp:
     def update_table(self):
         # Armazena o item selecionado
         self.selected_item = self.tree.selection()
+        if self.sensor_data.__len__()!=0:
 
-        try:
+            try:
 
-            # Limpa a tabela
-            for row in self.tree.get_children():
-                self.tree.delete(row)
-            
-            # Adiciona os dados atualizados à tabela
-            for data in self.sensor_data:
-                self.tree.insert("", "end", values=(data["UC"], data["ID"], data["TEMP"], data["Estado"]))
-        except tk.TclError:
-            pass
-            # Restaura a seleção
-            if self.selected_item:
-                self.tree.selection_set(self.selected_item)
+                # Limpa a tabela
+                for row in self.tree.get_children():
+                    self.tree.delete(row)
+                
+                # Adiciona os dados atualizados à tabela
+                for byte_data in self.sensor_data:
+                    data = json.loads(byte_data.decode('utf-8'))  # Decodifica bytes para string e, em seguida, faz o parsing JSON
+                    self.tree.insert("", "end", values=(data["UC"], data["ID"], data["TEMP"], data["Estado"]))
+
+            except tk.TclError:
+                pass
+                # Restaura a seleção
+                if self.selected_item:
+                    self.tree.selection_set(self.selected_item)
+            except AttributeError:
+                pass
 
 
     def update_table_thread(self):
@@ -135,17 +127,32 @@ class SensorManagementApp:
             self.update_table()
             time.sleep(1)
 
+    def getterSensors(self):
+        while True:
+            # Cria o corpo da solicitação JSON com a lista de unidades de controle inscritas
+            data = {"subs": self.subs}
+            if data["subs"].__len__()!=0:
+                try:
+                    # Envia a solicitação POST para o servidor
+                    response = requests.post("http://192.168.1.101:8080/sensors", json=data)
+                    
+                    # Verifica se a solicitação foi bem-sucedida (código de status 200)
+                    if response.status_code == 200:
+                        self.sensor_data = response.json()
+                        print(self.sensor_data)
+                    else:
+                        print("Erro:", response.status_code)
+                    
+                except Exception as e:
+                    print("Erro ao enviar solicitação de sensores:", e)
+
+            time.sleep(0.5)
 
 def main():
-    root = tk.Tk()
-    # Exibe a tela inicial para pegar o nome identificador
-    initial_screen = InitialScreen(root)
-    root.wait_window(initial_screen.root)
-
-    # Se um identificador foi fornecido, inicia a aplicação principal
-    if initial_screen.identifier:
-        app = SensorManagementApp(tk.Tk(), initial_screen.identifier)
-        app.root.mainloop()
+    app = SensorManagementApp(tk.Tk())
+    getterThread = thr.Thread(target=app.getterSensors,daemon=True)
+    getterThread.start()
+    app.root.mainloop()
 
 if __name__ == "__main__":
     main()

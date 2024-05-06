@@ -4,8 +4,8 @@ import socket
 import json
 import os
 
-SERVERTCPPORT = 8080
-SERVERUDPPORT = 1080
+SERVERTCPPORT = 8081
+SERVERUDPPORT = 8082
 SERVEIP = '192.168.1.101'
 
 
@@ -163,7 +163,7 @@ while menu in (1,2,3,4,5):
             sensor = searchSensor(r_id, sensores)
             if sensor:
                 sensor.altState(1)
-                ex_thread = thr.Thread(target=sensor.startMonitoring,args=(SERVEIP, SERVERUDPPORT,UCname,),daemon=True)
+                ex_thread = thr.Thread(target=sensor.startMonitoring,args=(SERVEIP, SERVERUDPPORT,UCname),daemon=True)
                 snrsThreads[r_id] = ex_thread
                 snrsThreads[r_id].start()
                 pass
