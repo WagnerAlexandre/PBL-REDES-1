@@ -7,9 +7,15 @@
   * * [Aplicação de Gerenciamento de Sensores (Client Side)](#aplicação-de-gerenciamento-de-sensores-client-side)
   * * [Servidor/Broker para o Gerenciamento de Sensores](#servidorbroker-para-o-gerenciamento-de-sensores)
   * * [Controladora de Sensores](#controladora-de-sensores)
-  * [Desenvolvimento da Solução](#desenvolvimento-da-solução)
-  * * [Aplicação de Gerenciamento](#aplicação-de-gerenciamento)
-
+  * [Sobre o Sistema](#sobre-o-sistema)
+  * * [Arquitetura da solução](#arquitetura-da-solução)
+  * * [Protocolo de comunicação entre dispositivo e Broker - camada de aplicação](#protocolo-de-comunicação-entre-dispositivo-e-broker---camada-de-aplicação)
+  * * [Protocolo de comunicação entre dispositivo e Broker - camada de transporte:](#protocolo-de-comunicação-entre-dispositivo-e-broker---camada-de-transporte)
+  * * [Interface da Aplicação (REST):](#interface-da-aplicação-rest)
+  * * [Formatação, envio e tratamento de dados](#formatação-envio-e-tratamento-de-dados)
+  
+  * * [Tratamento de conexões simultâneas](#tratamento-de-conexões-simultâneas)
+  * * [Desempenho](#desempenho)
 ----
 ## Introdução
 
@@ -81,31 +87,31 @@ Desligar um Sensor: Para a transmissão de dados de um sensor.
 * Visualizar os Sensores: Exibe uma lista dos sensores disponíveis e sua última leitura.
 
 #### Descrição dos Comandos
-1. Instanciar um Novo Sensor
- Comando: 1
- Descrição: Adiciona um novo sensor à lista de sensores disponíveis.
- Entrada: Não requer entrada adicional.
- Saída: Exibe o ID do novo sensor instanciado.
-2. Excluir um Sensor
- Comando: 2
- Descrição: Remove um sensor da lista de sensores.
- Entrada: ID do sensor a ser excluído.
- Saída: Confirmação da exclusão do sensor.
-3. Ligar um Sensor
- Comando: 3
- Descrição: Inicia a transmissão de dados de um sensor para a unidade de controle.
- Entrada: ID do sensor a ser ligado.
- Saída: Confirmação de que o sensor foi ligado.
-4. Desligar um Sensor
- Comando: 4
- Descrição: Para a transmissão de dados de um  sensor.
- Entrada: ID do sensor a ser desligado.
- Saída: Confirmação de que o sensor foi desligado.
-5. Visualizar os Sensores
- Comando: 5
- Descrição: Exibe uma lista dos sensores disponíveis e sua última leitura.
- Entrada: Não requer entrada adicional.
- Saída: Lista dos sensores disponíveis e suas últimas leituras.
++ Instanciar um Novo Sensor
+  + Comando: 1
+    Descrição: Adiciona um novo sensor à lista de sensores disponíveis.
+    Entrada: Não requer entrada adicional.
+    Saída: Exibe o ID do novo sensor instanciado.
++ Excluir um Sensor.
+  + Comando: 2
+    Descrição: Remove um sensor da lista de sensores.
+    Entrada: ID do sensor a ser excluído.
+    Saída: Confirmação da exclusão do sensor.
++ Ligar um Sensor.
+  + Comando: 3
+    Descrição: Inicia a transmissão de dados de um sensor para a unidade de controle.
+    Entrada: ID do sensor a ser ligado.
+    Saída: Confirmação de que o sensor foi ligado.
++ Desligar um Sensor.
+  + Comando: 4
+    Descrição: Para a transmissão de dados de um  sensor.
+    Entrada: ID do sensor a ser desligado.
+    Saída: Confirmação de que o sensor foi desligado.
++ Visualizar os Sensores.
+  + Comando: 5
+    Descrição: Exibe uma lista dos sensores disponíveis e sua última leitura.
+    Entrada: Não requer entrada adicional.
+    Saída: Lista dos sensores disponíveis e suas últimas leituras.
 
 #### Execução da Controladora
 
@@ -114,16 +120,33 @@ Desligar um Sensor: Para a transmissão de dados de um sensor.
 - Interagir com a Controladora: Utilize os comandos numéricos listados acima para interagir com a controladora e gerenciar os sensores.
 
 ---- 
-## Desenvolvimento da Solução
+## Sobre o Sistema
+#### Arquitetura da solução
 O sistema desenvolvido como solução foi dividido em três partes:
-1. Aplicação de gerenciamento - Esta é a interface do usuário para o sistema.
-2. Servidor/Broker - O servidor possui o serviço *Broker* e API REST integradas.
-3. Unidade de Controle - Como forma de melhor gerenciar diversos dispositivos, foi escolhido instanciar conjuntos de dispositivos em um conjunto, este chamado de Unidade de Controle.
-Os dispositivos virtuais escolhidos para gerar os dados foram sensores de temperatura. 
+1. Aplicação de gerenciamento:
+    1.  Esta parte da solução é a interface do usuário para o sistema.
+    2.  Desenvolvida usando Tkinter, uma biblioteca gráfica para Python.
+    3.  Permite ao usuário visualizar os dados dos sensores e interagir com o sistema de gerenciamento de forma intuitiva.
+    4.  Realiza operações como conectar-se a UCs, instanciar, excluir, ligar e desligar sensores através de solicitações HTTP para a API do servidor/broker.
 
-#### Aplicação de Gerenciamento
-A aplicação de gerenciamento é responsável por apresentar os dados dos sensores das unidades de controle conectadas ao servidor ao usuário e também por pegar os comandos do usuário e comunica-los ao servidor. Para facilitar o uso, foi desenvolvida uma interface gráfica simples utilizando *Tkinter*.
-A aplicação se comunica com o servidor por meio de mensagens HTTP para a API implementada no broker, ao enviar solicitações para conectar-se a uma unidade de controle, instanciar sensores, excluir sensores, ligar sensores e desligar sensores. O servidor processa essas solicitações e interage com os dispositivos de sensoriamento conforme necessário.
+2. Servidor/Broker - O servidor possui o serviço *Broker* e API REST integradas.
+    1.  O servidor possui o serviço de Broker e uma API REST integrada.
+    2.  Responsável por receber e processar as solicitações da aplicação de gerenciamento.
+    3.  Implementa lógica para conectar UCs, instanciar, excluir, ligar e desligar sensores ao enviar dados via TCP/IP para respectivas UC's e sensores.
+    4.  Gerencia a comunicação entre a aplicação de gerenciamento e as UCs, se necessário.
+
+3. Unidade de Controle - Como forma de melhor gerenciar diversos dispositivos, foi escolhido instanciar conjuntos de dispositivos em um conjunto, este chamado de Unidade de Controle.
+    1.  Os dispositivos virtuais escolhidos para gerar os dados foram sensores de temperatura. 
+    2.  Responsável por gerenciar os sensores instanciados e processar as solicitações da aplicação de gerenciamento.
+
+
+#### Comunicação entre Componentes:
+##### Aplicação de Gerenciamento <-> Servidor/Broker:
+A aplicação de gerenciamento se comunica com o servidor/broker através de solicitações HTTP para a API REST para enviar solicitações para conectar-se a UCs, instanciar, excluir, ligar e desligar sensores e ainda recebe respostas do servidor/broker para confirmar o sucesso ou falha das operações.
+
+##### Servidor/Broker <-> Unidade de Controle (UC):
+O servidor/broker se comunica com as UCs para receber dados dos sensores e enviar comandos para ligar ou desligar sensores, se utilizando da combinação de sockets TCP/IP, o servidor foi projeto para lidar de maneira assíncrona a cada acesso, inciando go routines para cada conexão.
+
 
 #### Protocolo de comunicação entre dispositivo e Broker - camada de aplicação
 Na troca de mensagens entre as UCs (Unidades de Controle) e o broker, foram definidos os seguintes protocolos:
@@ -139,7 +162,7 @@ As UCs podem enviar comandos para o servidor broker para controlar os sensores. 
 
 * Protocolo de Atualização de Sensores:
 Os dados dos sensores são enviados do dispositivo para o servidor broker via UDP em intervalos regulares. Cada mensagem UDP contém informações sobre o sensor, incluindo seu ID, temperatura e estado atual.
-    >Essas mensagens são transmitidas periodicamente para fornecer atualizações em tempo real sobre o estado dos sensores para o servidor broker.
+    Essas mensagens são transmitidas periodicamente para fornecer atualizações em tempo real sobre o estado dos sensores para o servidor broker.
 
 #### Protocolo de comunicação entre dispositivo e Broker - camada de transporte:
 
@@ -152,7 +175,7 @@ Na camada de transporte, é utilizada tanto o protocolo TCP quanto UDP:
 * UDP (User Datagram Protocol):
         Na transmissão dos dados dos sensores do dispositivo para o servidor broker, o UDP é utilizado. Como os dados dos sensores são enviados em intervalos regulares e podem ser perdidos ocasionalmente sem afetar significativamente o sistema, o UDP é uma escolha adequada para essa finalidade.
         Cada mensagem UDP contém informações sobre o sensor, como seu ID, temperatura e estado atual. Essas mensagens são transmitidas periodicamente pelas UCs para fornecer atualizações em tempo real sobre o estado dos sensores para o servidor broker.
-        O UDP é preferido nesse cenário devido à sua menor sobrecarga de cabeçalho e latência em comparação com o TCP, o que é crucial para a transmissão eficiente de dados de sensor em tempo real.
+
 
 #### Interface da Aplicação (REST):
 Na interface da aplicação, os verbos HTTP padrão (GET, POST, DELETE) são utilizados para interagir com os sensores. As rotas da API REST incluem:
@@ -169,3 +192,10 @@ Para manter a API state-less, uma vez que não há propriamente um banco de dado
 #### Formatação, envio e tratamento de dados:
 
 Os dados são formatados de acordo com o padrão JSON (JavaScript Object Notation). Isso possibilita que dispositivos e servidor compreendam as mensagens trocadas, garantindo a interoperabilidade entre diferentes nós do sistema. Após a transmissão, os dados são decodificados e processados pelo servidor para atualização do estado dos sensores ou execução das outras operações conforme necessário.
+
+#### Tratamento de conexões simultâneas
+Ao empregar go routines para lidar com cada tipo de acesso no servidor, não foi necessário lidar com acessos simultâneos, devido ao próprio GO já gerenciar automaticamente suas rotinas.
+
+#### Desempenho
+Visando minimizar o tempo de resposta da requisição das leituras, o sistema já guarda em uma especie de cache a ultima leitura feita por cada sensor conectado ao sistema.
+Ainda, O uso de go routines separadas para cada tipo de acesso ao servidor, faz com que o mesmo lide com cada um de forma assíncrona, permitindo que cada solicitação seja processada "simultaneamente", aumentando a eficiência e throughput.
