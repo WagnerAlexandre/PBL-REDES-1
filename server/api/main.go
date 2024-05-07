@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type CUnits struct {
@@ -16,6 +17,7 @@ type CUnits struct {
 	Inscritos []string
 	IP        net.IP
 }
+
 type Mensagem struct {
 	Tipo     int
 	Conteudo string
@@ -82,6 +84,33 @@ func handleConnection(conn net.Conn) {
 	if infor.Tipo == 1 {
 		// Chame a função registerUC passando o nome da unidade de controle
 		registerUC(infor.Conteudo, conn)
+	}
+}
+
+func checkConnections() {
+	for {
+		time.Sleep(15 * time.Second) // Aguarda 10 segundos
+
+		// Lista para armazenar as chaves (nomes das unidades de controle) a serem removidas
+		var keysToRemove []string
+
+		// Iterar sobre todas as unidades de controle no mapa
+		for ucName, unit := range UnidadesControle {
+			// Tenta conectar-se à unidade de controle para verificar se ainda está ativa
+			conn, err := net.DialTimeout("tcp", fmt.Sprintf("%s:8083", unit.IP.String()), 2*time.Second)
+			if err != nil {
+				// Se houver um erro ao conectar, significa que a unidade de controle não está mais acessível
+				fmt.Println("Unidade de controle desconectada:", ucName)
+				keysToRemove = append(keysToRemove, ucName)
+				continue
+			}
+			conn.Close() // Fecha a conexão
+		}
+
+		// Remove as unidades de controle desconectadas do mapa
+		for _, key := range keysToRemove {
+			delete(UnidadesControle, key)
+		}
 	}
 }
 
@@ -183,10 +212,10 @@ func main() {
 	Addr := "192.168.1.101"
 	httpPort := 8080
 
-	// porta para o servidor TCP/IP
+	// porta para o listener TCP/IP
 	tcpPort := 8081
 
-	//  porta para o servidor UDP
+	//  porta para o listener UDP
 	udpPort := 8082
 
 	done := make(chan struct{})
@@ -197,10 +226,16 @@ func main() {
 		http.HandleFunc("/sensors", getSensors)
 		http.HandleFunc("/instSensor", instSensors)
 		http.HandleFunc("/verificar", verificar)
+		http.HandleFunc("/excludeSensor", excludeSensor)
+		http.HandleFunc("/ligarSensor", ligarSensor)
+		http.HandleFunc("/desligarSensor", desligarSensor)
 
 		log.Printf("HTTP server is ON %s:%d\n", Addr, httpPort)
 		log.Fatal(http.ListenAndServe(fmt.Sprintf("%s:%d", Addr, httpPort), nil))
 	}()
+
+	// checa se as unidades de controle foram desconectadas
+	go checkConnections()
 
 	// Inicie o servidor TCP/IP em uma goroutine separada
 	go func() {
@@ -215,6 +250,50 @@ func main() {
 	}()
 
 	<-done // Aguarde a conclusão de todos os servidores
+}
+
+type Requisicao struct {
+	UcName   string `json:"UcName"`
+	SensorID int    `json:"Sensor_id"`
+}
+
+func controlSensor(w http.ResponseWriter, r *http.Request, command string) {
+	if r.Method != "POST" {
+		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+		return
+	}
+
+	var item Requisicao
+	err := json.NewDecoder(r.Body).Decode(&item)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Envia o comando para a unidade de controle correspondente
+	err = sendCommandToUC(item.UcName, string(rune(item.SensorID))+"|"+command)
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if command == "exclude" {
+		delete(UnidadesControle[item.UcName].Sensores, strconv.Itoa(item.SensorID))
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
+func ligarSensor(w http.ResponseWriter, r *http.Request) {
+	controlSensor(w, r, "ligar")
+}
+
+func desligarSensor(w http.ResponseWriter, r *http.Request) {
+	controlSensor(w, r, "desligar")
+}
+
+func excludeSensor(w http.ResponseWriter, r *http.Request) {
+	controlSensor(w, r, "exclude")
 }
 
 type User struct {
@@ -252,9 +331,47 @@ func instSensors(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
 		return
 	}
-	var item InstJson
-	json.NewDecoder(r.Body).Decode(&item)
 
+	var item InstJson
+	err := json.NewDecoder(r.Body).Decode(&item)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Envia o comando para a unidade de controle correspondente
+	err = sendCommandToUC(item.UcName, string(rune(item.SensorCount))+"|"+"instSen")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Resposta de sucesso
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("Comando enviado com sucesso para a unidade de controle"))
+}
+
+func sendCommandToUC(UcName string, command string) error {
+	// Obtém o endereço IP da unidade de controle com base no nome fornecido
+	ip := UnidadesControle[UcName].IP
+
+	// Estabelece uma conexão TCP/IP com o endereço IP da unidade de controle
+	conn, err := net.Dial("tcp", ip.String()+":8083")
+
+	if err != nil {
+		return fmt.Errorf("Erro ao conectar ao endereço IP %s: %s", ip, err.Error())
+	}
+	defer conn.Close()
+
+	// Envia o comando TCP/IP para a unidade de controle
+	_, err = conn.Write([]byte(command))
+
+	if err != nil {
+		return fmt.Errorf("Erro ao enviar comando para a unidade de controle: %s", err.Error())
+	}
+
+	fmt.Println("Comando enviado com sucesso para a unidade de controle:", UcName)
+	return nil
 }
 
 func getSensors(w http.ResponseWriter, r *http.Request) {
@@ -281,8 +398,8 @@ func getSensors(w http.ResponseWriter, r *http.Request) {
 		// Verificar se o tópico existe no mapa UnidadesControle
 		unit, ok := UnidadesControle[topico]
 		if !ok {
-			fmt.Println("Unidade de controle não encontrada:", topico)
-			continue
+			http.Error(w, topico, http.StatusNotFound)
+			return
 		}
 
 		// Lista para armazenar os sensores desta unidade de controle

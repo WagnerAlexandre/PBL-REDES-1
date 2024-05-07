@@ -28,28 +28,42 @@ def createNewSensor(sensores):
     else:
         new_id = createId(sensores)
 
-    newSrs = Sensor(temp= False,estado=0,id=new_id)
+    newSrs = Sensor(temp= 0,estado=0,id=new_id)
     sensores.append(newSrs)
   
     return new_id
 
-def excludeSensor(id: int, sensores):
-    rmv = searchSensor(id,sensores)
-    if rmv:
-        rmv.altState(0)
-        sensores.remove(rmv)
-        rmv = True
-        return 1
+def excludeSensor(id: int, sensores: list[Sensor]):
+    for i in sensores:
+        if i.get_id()==id:
+            sensores.remove(i)
     else:
+        return 1
+    
+def ligarSensor(id: int, sensores):
+    sensor = searchSensor(id, sensores)
+    if sensor != -1:
+        sensor.altState(1)
+        ex_thread = thr.Thread(target=sensor.startMonitoring,args=(SERVEIP, SERVERUDPPORT,UCname,),daemon=True)
+        snrsThreads[id] = ex_thread
+        snrsThreads[id].start()
         return 0
-
-def searchSensor(id: int, sensores):
-    fd = 0
+    else:
+        return 1
+    
+def searchSensor(id, sensores):
+    fd = -1
     for i in sensores:
         if i.get_id()==id:
           fd = i
           break
     return fd
+
+def desligarSensor(id,sensores: list[Sensor]):
+    for i in sensores:
+        if i.get_id()==id:
+            i.altState(0)
+    pass
 
 def print_Sns_ID():
     for sensor in sensores:
@@ -62,7 +76,7 @@ newID = 0
 
 def msgMenu():
     clear()
-    print("DIGITE:\n"
+    print(f"CONTROLADORA: {UCname} | DIGITE:\n"
             "1 - PARA INSTANCIAR UM NOVO SENSOR\n"
             "2 - PARA APAGAR UM SENSOR\n"
             "3 - PARA LIGAR UM SENSOR\n"
@@ -92,14 +106,16 @@ def register(UCname):
             return 1
     return 0
 
-def receiver_tcp(REGUC, port, done):
+def receiver_tcp():
     # Cria um socket TCP/IP
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        while done:
-            # Associa o socket à porta
-            s.bind((REGUC, port))
-            # Coloca o socket para escutar conexões
-            s.listen()
+        # Associa o socket à porta
+        s.bind((SERVEIP, 8083))
+        
+        # Coloca o socket para escutar conexões
+        s.listen()
+
+        while True:
             # Aceita a conexão
             conn, addr = s.accept()
             with conn:
@@ -109,19 +125,40 @@ def receiver_tcp(REGUC, port, done):
                     if not data:
                         break
                     else:
+                        # Chama a função multiplexador para processar os dados recebidos
                         multiplexador(data)
 
-def multiplexador(data):
-    print(data)
 
     pass
 
-def process_commands(comando_str):
-    comando, id_sensor, ip_requisitante = comando_str.split('|')
-    process_command(comando, id_sensor, ip_requisitante)
+def multiplexador(data: bytes):
+    # Decodifica os dados recebidos
+    numero_inteiro = int(data[0])
+    data_str = data.decode('utf-8')
+    data_parts = data_str.split("|")
 
-def process_command(comando, id_sensor, ip_requisitante):
-    print(f"Comando recebido - Comando: {comando}, ID do sensor: {id_sensor}, IP do requisitante: {ip_requisitante}")
+    
+    if "instSen" in data_parts:
+        for i in range(numero_inteiro):
+            createNewSensor(sensores)
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            for i in sensores:
+                data = f"{UCname}|{i.get_id()}|{i.get_temp()}|{i.get_estado()}".encode()
+                s.sendto(data, (SERVEIP, SERVERUDPPORT))
+
+    elif "exclude" in data_parts:
+        excludeSensor(numero_inteiro, sensores)
+
+    elif "ligar" in data_parts:
+        ligarSensor(numero_inteiro, sensores)
+
+    elif "desligar" in data_parts:
+        desligarSensor(numero_inteiro, sensores)
+        pass
+
+    else:
+        # Comando desconhecido
+        print("Comando desconhecido:", data_parts)
 
 err = 1
 while err:
@@ -133,10 +170,10 @@ while err:
         print("Controladora já existe no sistema.")
     elif err ==0:
         print("Registro feito com sucesso!")
-    input()
-    
-receiver_thr = thr.Thread(target=receiver_tcp,daemon=True)
-receiver_thr.start()
+        receiver_thr = thr.Thread(target=receiver_tcp,daemon=True)
+        receiver_thr.start()   
+    input() 
+
 menu = 1
 while menu in (1,2,3,4,5):
 
@@ -149,7 +186,7 @@ while menu in (1,2,3,4,5):
 
     elif menu == 2:
         x_id = int(input("Digite o ID do sensor a ser excluido: "))
-        if excludeSensor(x_id,sensores):
+        if excludeSensor(x_id,sensores)!=-1:
             print("Sensor removido")
         else:
             print("ID:",x_id,"- não encontrado.")
@@ -163,7 +200,7 @@ while menu in (1,2,3,4,5):
             sensor = searchSensor(r_id, sensores)
             if sensor:
                 sensor.altState(1)
-                ex_thread = thr.Thread(target=sensor.startMonitoring,args=(SERVEIP, SERVERUDPPORT,UCname),daemon=True)
+                ex_thread = thr.Thread(target=sensor.startMonitoring,args=(SERVEIP, SERVERUDPPORT,UCname,),daemon=True)
                 snrsThreads[r_id] = ex_thread
                 snrsThreads[r_id].start()
                 pass
