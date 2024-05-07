@@ -1,4 +1,4 @@
-# PBL - Concorrência e conectividade  1 - Aplicação de gerenciamento de dispositivos via Servidor
+# PBL 1 - Concorrência e conectividade - Aplicação de gerenciamento de dispositivos via Servidor
 -----
 ### Sumario
 
@@ -13,7 +13,7 @@
   * * [Protocolo de comunicação entre dispositivo e Broker - camada de transporte:](#protocolo-de-comunicação-entre-dispositivo-e-broker---camada-de-transporte)
   * * [Interface da Aplicação (REST):](#interface-da-aplicação-rest)
   * * [Formatação, envio e tratamento de dados](#formatação-envio-e-tratamento-de-dados)
-  
+
   * * [Tratamento de conexões simultâneas](#tratamento-de-conexões-simultâneas)
   * * [Desempenho](#desempenho)
 ----
