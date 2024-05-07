@@ -10,7 +10,6 @@ SERVEIP = '192.168.1.101'
 
 
 
-
 def clear():
     os.system('cls')
 
@@ -131,8 +130,8 @@ def receiver_tcp():
 
     pass
 
+# decodifica e separa as informacoes recebidas
 def multiplexador(data: bytes):
-    # Decodifica os dados recebidos
     numero_inteiro = int(data[0])
     data_str = data.decode('utf-8')
     data_parts = data_str.split("|")
